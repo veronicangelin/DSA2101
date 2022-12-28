@@ -1,0 +1,122 @@
+---
+title: "DSA2101 Assignment 3 - Data Exploration"
+#author: "Veronica Angelin Setiyo A0240487B"
+output: tufte::tufte_handout: default
+date: "2022-11-05"
+---
+
+## Choice of dataset
+Chocolate Ratings
+This dataset consists of 1 csv file, chocolate.csv, 
+```{r, echo=FALSE}
+tuesdata <- readRDS("/Users/veronicangelin/Downloads/DSA2101/src/tuesdata.rds")
+
+directors <- tuesdata$directors
+episodes <- tuesdata$episodes
+writers <- tuesdata$writers
+imdb <- tuesdata$imdb
+
+
+
+```
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gridExtra)
+```
+
+## Including Plots
+```{r, echo=FALSE, fig.align = "centre"}
+imdb_se <- imdb %>% 
+  mutate(season_ep = as.factor(paste(season, ep_num)))
+  
+episodes$episode_number[is.na(episodes$episode_number)] = 0
+episode_mutated <- episodes %>%
+  mutate(season_ep = as.factor(paste(season_number, episode_number)))
+
+full <- episode_mutated %>%
+  full_join(imdb_se, by = "season_ep") %>%
+  mutate(increasing = ifelse(season == (1 | 3), TRUE, FALSE))
+full <- full[-c(56:60, 166:177),]
+full <- full[-c(98,99),]
+
+ggplot(full) +
+  geom_point(aes(x = ep_num, y = rating.y, color = rating_n, size = uk_viewers/10), alpha = 0.5) +
+  labs(title = "Ratings and Views of Dr. Who Episodes accross the Seasons") +
+  guides(fill=guide_legend(title="Number of Ratings"), size = guide_legend(title="UK Viewers in 10 millions")) +
+  xlab("Episode\nSeason") +
+  ylab("Rating") +
+  geom_line(aes(x = ep_num, y = rating.y), alpha = 0.5) +
+  geom_line(aes(x = ep_num, y = rating.y), stat="smooth",method = "lm", colour = "red", alpha = 0.5, size = 0.5) +
+  scale_y_continuous(limits = c(0, 10)) +
+  scale_x_continuous(position = "top") +
+  facet_grid(cols = vars(season)) +
+  scale_color_continuous(type = "viridis") +
+  theme_classic() +
+  theme(aspect.ratio = 5, legend.position = "bottom", legend.direction = "vertical")
+```
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE, fig.align = "centre", out.width="100%"}
+epi <- episodes %>%
+  full_join(directors, by = "story_number") %>%
+  full_join(writers, by = "story_number")
+
+epi <- epi[-c(181:185),]
+
+epis <- epi %>%
+  mutate(combi = paste(director,writer)) %>%
+  group_by(combi) %>%
+  mutate(n = n(), mean_rating = mean(rating)) %>%
+  mutate(a = 1, b = "b")
+
+epii <- epi %>%
+  mutate(combi = paste(director,writer)) %>%
+  group_by(combi) %>%
+  mutate(n = n(), mean_rating = mean(rating)) %>%
+  mutate(writer_edited = ifelse(writer == "Russell T Davies" | writer == "Steven Moffat"| writer == "Chris Chibnall" , writer, "others")) %>%
+  mutate(code = ifelse(writer == "Russell T Davies", 2, ifelse(writer == "Steven Moffat", 3, ifelse(writer == "Chris Chibnall", 1, 0)))) %>%
+  arrange(desc(code)) %>%
+  ungroup() %>%
+  mutate(a = 1, b = "b", m = n())
+
+final_2_1 <-ggplot(epii) +
+  geom_col(aes(x = b, y = a, fill = reorder(writer_edited, -code, mean)), ) +
+  scale_fill_manual(values = c("Russell T Davies" = "#F4C2C2", "others" = "gray", "Steven Moffat" = "#F7ACCF", "Chris Chibnall" = "#EC9EC0")) +
+  annotate("text", x = 1, y = 90, label = "12.22%", colour = "white") +
+  annotate("text", x = 1, y = 117, label = "17.22%", colour = "white") +
+  annotate("text", x = 1, y = 155, label = "26.67%", colour = "white") +
+  annotate("text", x = 1, y = 143, label = "Total =") +
+  annotate("text", x = 1, y = 135, label = "56.11%") +
+  labs(title = "Proportion of Episodes\nWritten by 3 Writers") +
+  guides(fill=guide_legend(title="Writers")) +
+  xlab("") +
+  ylab("Number of Episodes Written") +
+  theme_classic() +
+  theme(aspect.ratio = 5, axis.text.x = element_blank(), axis.line.x = element_blank(), axis.ticks.x = element_blank()) 
+  
+
+#PLOT2
+final_2_2 <- ggplot(epis, aes(x = reorder(director, -rating, mean, na.rm = TRUE), y = reorder(writer, -rating, mean, na.rm = TRUE), label=n, fill = mean_rating)) +
+  guides(fill=guide_legend(title="Mean Rating")) +
+  #geom_rect(aes(xmin = 0, ymin = 0, xmax = 54, ymax = 10), alpha=0.005, fill = "yellow")+
+  geom_rect(aes(xmin = 0, ymin = 10.5, xmax = 54, ymax = 11.5), alpha=0.05, fill = "#F4C2C2")+
+  geom_rect(aes(xmin = 0, ymin = 13.5, xmax = 54, ymax = 14.5), alpha=0.05, fill = "#F7ACCF")+
+  geom_rect(aes(xmin = 0, ymin = 26.5, xmax = 54, ymax = 27.5), alpha=0.05, fill = "#EC9EC0")+
+  geom_raster() +
+  geom_text(colour = "white") +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_discrete(drop = FALSE) +
+  scale_fill_continuous(type = "viridis", limits= c(75,95)) +
+  labs(title = "Average Rating of Dr Who episodes\nbased on Writer and Director") +
+  xlab("Directors arranged by mean rating") +
+  ylab("Writers arranged by mean rating") +
+  theme(axis.text.x = element_text(angle = 270, hjust = 0))
+#list_of_plots <- list(final_2_1, final_2_2)
+final_2_1
+final_2_2
+#grid.arrange(grobs = list_of_plots)
+```
+
+End of Document
