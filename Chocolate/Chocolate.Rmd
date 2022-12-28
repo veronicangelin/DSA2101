@@ -1,0 +1,40 @@
+---
+title: "Chocolate Bar Ratings Exploration"
+output: html_document
+date: "2022-12-28"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+tuesdata1 <- tidytuesdayR::tt_load('2022-01-18')
+chocolate <- tuesdata1$chocolate
+```
+
+## Chocolate Dataset
+
+The dataset is from [Chocolate Bar Ratings](https://github.com/rfordatascience/tidytuesday/blob/master/data/2022/2022-01-18/readme.md) dataset obtained from TidyTuesday project. This is the dataset that I initially wanted to use for my assignment 3 before switching datasets.
+
+```{r cleaning}
+chocolate_percent <- chocolate$cocoa_percent
+chocolate_new_percent <- str_extract(chocolate_percent, "\\d+")
+chocolate$cocoa_percent <- as.numeric(chocolate_new_percent)
+
+chocolate_ingredients <- chocolate$ingredients
+
+chocolate_ingredients_count <- as.factor(str_extract(chocolate_ingredients, "\\d"))
+
+ing_count <- cbind(chocolate, chocolate_ingredients_count)
+```
+
+## Plot
+
+```{r plot, echo=FALSE, message=FALSE}
+ggplot(ing_count) +
+  geom_point(aes(x = cocoa_percent, y = rating, colour = chocolate_ingredients_count), position = "jitter", alpha = 0.25) +
+  geom_smooth(aes(x = cocoa_percent, y = rating)) +
+  labs(title = "Relationship Between Percentage of Cocoa and Rating for Chocolate with Different Ingredients Count", 
+       x = "Cocoa Percentage (%)", y = "Rating", colour = "No of Ingredients")
+```
+
+This plot has high concentration of chocolates with 3 ingredients and 70% cocoa percentage. As expected, the less number of ingredients generally indicate higher cocoa percentage. We can also see that the highest ratings are generally from chocolates with around 70% cocoa, and those in the upper and lower ends of the percentage, around 100% and 40%, have lower ratings. 
