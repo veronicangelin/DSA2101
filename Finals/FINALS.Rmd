@@ -1,0 +1,148 @@
+---
+title: "DSA2101 Finals"
+author: "Veronica Angelin Setiyo A0240487B"
+output: html_document
+date: "2022-11-27"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(GGally)
+library(gridExtra)
+```
+
+## Reading data
+```{r}
+diving <- read_excel("../data/Diving2000.xlsx")
+```
+
+
+## Question 1
+```{r}
+colour_codes <- c("AUS"="#FFF200", "CAN"="#FFFFFF", "CHN"="#EE1C25",
+"GER"="#FFCC00", "JPN"="#BC002D", "MEX"="#006341",
+"RUS"="#1C3578", "SWE"="#006AA7", "USA"="#0A3161")
+
+div1 <- diving %>%
+  filter(Round == "Final") %>%
+  group_by(Event, Rank, Country) %>%
+  summarise(n()) %>%
+  filter(Rank %in% c(1,2,3,4,5))
+
+ggplot(div1) +
+  geom_tile(aes(x = Event, y = reorder(Rank, -Rank, median), fill = Country), show.legend=FALSE) +
+  scale_fill_manual(values = colour_codes) +
+  geom_text(aes(x = Event, y = reorder(Rank, -Rank, median), label = Country)) +
+  labs(title="Countries of Top−ranked Divers In Each Event.", y="Rank",
+       x="Event")
+```
+
+## Question 2
+```{r, warning=FALSE}
+div2 <- diving %>%
+  filter(Round == "Final") %>%
+  mutate(Gender = if_else(str_detect(Event, "^M"), "Men's", "Women's")) %>%
+  group_by(Event, Diver, Country, Gender)%>%
+  summarise(n()) %>%
+  ungroup() %>%
+  mutate(Country = factor(Country, levels=c("CHN", "USA", "RUS", "AUS", 
+                          "GER", "CAN", "JPN", "KAZ", 
+                          "PRK", "UKR", "AUT", "GBR", "HUN", "MEX", "SWE")))
+
+ggplot(div2) +
+  geom_bar(aes( x=reorder(Country, Country, mean), fill = Gender)) +
+  labs(title="Number of Divers from each Country in Finals Round, across all Events.", y="Count", x = "Country")
+```
+## Qn 3
+(a)
+
+1. Judge, Rank, JScore, Event (this one could have been filtered before the ggplot call though)
+
+
+2. Geom_tile( aes( x = Diver Rank, Y = Judge, fill = Residual)) fill colour high = blue, mid = white, low = dark red.
+
+Geom_text( aes( x = Diver Rank, Y = Judge, label = score ) )
+
+
+
+(b)
+
+good:
+
+- The fill colour scale is suitably chosen, which is able to indicate which ones have positive residuals (blue) and which ones have negative residuals
+
+- Because of the colour chosen and that the Judges are ordered based on their average residual, I can immediately see that Boussard and Calderon (top 2) tend to be stingy in their scoring, whilstt
+
+bad:
+
+- Diver Average shouldn't have been put at the tile as well, which at first glance may be confused as another set of judge since the label is included in the y axis. Instead, the Diver Rank could have just been replaced with the Diver Averange, since the rank of the diver can be implied if the diver average is ordered based on its rank in the x axis.
+
+Further improvement:
+
+I think we can also include the country of origin of the Judges and the divers alongside their names, so that we can see if there is any bias in the scored because of the country of origins of the Judges and the Divers. Eg, when the country of origins coincide, the scores tend to be highe vice versa.
+
+^Apparently this is the next question
+
+## Question 4
+```{r}
+library(tidyverse)
+library(readxl)
+divers <- read_excel("../data/Diving2000.xlsx")
+
+matched_dives <- group_by(divers, Event, Round, Diver, Country, DiveNo) %>%
+  filter(Country %in% JCountry) %>% ungroup()
+
+judge_match_diver <- filter(matched_dives, JCountry == Country)
+judge_nomatch_diver <- filter(matched_dives, JCountry != Country)
+
+ave_judge_nomatch_diver <- group_by(judge_nomatch_diver,
+                                    Event, Round, Diver, Country, DiveNo) %>%
+  summarise(OJScore = mean(JScore), .groups="drop")
+
+compare_tbl <- left_join(ave_judge_nomatch_diver, judge_match_diver,
+                         by=c("Event", "Round", "Diver", "Country",  "DiveNo"))
+matched_mean_diff <- group_by(compare_tbl, Judge, JCountry) %>%
+  summarise(n=n(), mean= mean(JScore - OJScore),
+            sd= sd(JScore - OJScore), .groups="drop") %>% arrange(desc(mean))
+
+judge_countries <- select(divers, Judge, JCountry) %>% unique()
+nonmatched_mean_diff <- NULL
+
+for(ii in 1:NROW(judge_countries)){
+  jj <- judge_countries$Judge[ii]
+  jcountry <- judge_countries$JCountry[ii]
+
+  unmatched_dives_jj <- group_by(divers, Event, Round, Diver, Country, DiveNo) %>%
+    filter(jj %in% Judge, !jcountry %in% Country) %>% ungroup()
+
+  jj_scores <- filter(unmatched_dives_jj, Judge == jj)
+  not_jj_scores <- filter(unmatched_dives_jj, Judge != jj) %>%
+    group_by(Event, Round, Diver, Country, DiveNo) %>%
+    summarise(OJScore = mean(JScore), .groups="drop")
+  compare_tbl <- left_join(not_jj_scores, jj_scores,
+                         by=c("Event", "Round", "Diver", "Country",  "DiveNo"))
+  compare_tbl %>% summarise(n=n(), mean=mean(JScore - OJScore), sd=sd(JScore - OJScore),
+                            Judge=Judge[1], JCountry=JCountry[1]) -> j_nonmatch
+  nonmatched_mean_diff <- bind_rows(nonmatched_mean_diff, j_nonmatch)
+}
+```
+
+```{r}
+joined_judges <- matched_mean_diff %>%
+  inner_join(nonmatched_mean_diff, by = "Judge") %>%
+  select(Judge, n.x, mean.x, mean.y) 
+names(joined_judges) <- c("Judge", "n", "Matched", "Not Matched")
+joined_judges <- joined_judges %>%
+  pivot_longer("Matched":"Not Matched")
+
+
+ggplot(joined_judges) +
+  geom_col(aes(x=Judge, y=value, fill = name), position = "dodge") +
+  theme(axis.text.x = element_text(angle = 270, hjust = 0)) +
+  labs(title="Scoring difference between judging own's country vs not own's country ", y="Mean difference", x = "Judges")
+```
+Wang is the only one whose mean score for not matched is higher than that of matched. 
+
+Addition explanation is on Examplify.
